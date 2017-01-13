@@ -26,6 +26,13 @@ class SQLite3Query extends Query
     protected $handle;
 
     /**
+     * An array of every result in the set.
+     *
+     * @var array
+     */
+    protected $allRows;
+
+    /**
      * Hook the result-set given into a Query class, suitable for use by framework.
      * @param SQLite3Connector $database The database object that created this query.
      * @param SQLite3Result $handle the internal sqlite3 handle that is points to the resultset.
@@ -43,36 +50,37 @@ class SQLite3Query extends Query
         }
     }
 
-    public function seek($row)
+    protected function getAllRows()
     {
-        $this->handle->reset();
-        $i=0;
-        while ($i <= $row && $result = @$this->handle->fetchArray(SQLITE3_ASSOC)) {
-            $i++;
+        if ($this->allRows === null) {
+            $this->allRows = [];
+
+            $this->handle->reset();
+            while ($data = $this->handle->fetchArray(SQLITE3_ASSOC)) {
+                $this->allRows[] = $data;
+            }
+            $this->handle->reset();
         }
-        return $result;
+
+        return $this->allRows;
     }
 
-    /**
-     * @todo This looks terrible but there is no SQLite3::get_num_rows() implementation
-     */
+    public function seek($row)
+    {
+        $rows = $this->getAllRows();
+        return isset($rows[$row]) ? $rows[$row] : false;
+    }
+
     public function numRecords()
     {
-        $this->handle->reset();
-        $c=0;
-        while ($this->handle->fetchArray()) {
-            $c++;
-        }
-        $this->handle->reset();
-        return $c;
+        return count($this->getAllRows());
     }
 
     public function nextRecord()
     {
-        if ($data = $this->handle->fetchArray(SQLITE3_ASSOC)) {
-            return $data;
-        } else {
-            return false;
-        }
+        $rows = $this->getAllRows();
+        $next = $this->key() + 1;
+
+        return isset($rows[$next]) ? $rows[$next] : false;
     }
 }
